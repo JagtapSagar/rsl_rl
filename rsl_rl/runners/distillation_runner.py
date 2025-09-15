@@ -11,9 +11,9 @@ import torch
 from collections import deque
 
 import rsl_rl
-from rsl_rl.algorithms import Distillation
+from rsl_rl.algorithms import Distillation, MultiTeacherDistillation
 from rsl_rl.env import VecEnv
-from rsl_rl.modules import StudentTeacher, StudentTeacherRecurrent
+from rsl_rl.modules import StudentTeacher, StudentTeacherRecurrent, MultiTeacher
 from rsl_rl.runners import OnPolicyRunner
 from rsl_rl.utils import resolve_obs_groups, store_code_state
 
@@ -153,18 +153,18 @@ class DistillationRunner(OnPolicyRunner):
     Helper methods.
     """
 
-    def _construct_algorithm(self, obs) -> Distillation:
+    def _construct_algorithm(self, obs) -> Distillation | MultiTeacherDistillation:
         """Construct the distillation algorithm."""
-        # initialize the actor-critic
-        student_teacher_class = eval(self.policy_cfg.pop("class_name"))
-        student_teacher: StudentTeacher | StudentTeacherRecurrent = student_teacher_class(
+        # initialize the policy (student-teacher or multi-teacher)
+        policy_class = eval(self.policy_cfg.pop("class_name"))
+        policy: StudentTeacher | StudentTeacherRecurrent | MultiTeacher = policy_class(
             obs, self.cfg["obs_groups"], self.env.num_actions, **self.policy_cfg
         ).to(self.device)
 
         # initialize the algorithm
         alg_class = eval(self.alg_cfg.pop("class_name"))
-        alg: Distillation = alg_class(
-            student_teacher, device=self.device, **self.alg_cfg, multi_gpu_cfg=self.multi_gpu_cfg
+        alg: Distillation | MultiTeacherDistillation = alg_class(
+            policy, device=self.device, **self.alg_cfg, multi_gpu_cfg=self.multi_gpu_cfg
         )
 
         # initialize the storage
